@@ -1,0 +1,215 @@
+diff -aur linux-4.9/Documentation/networking/ip-sysctl.txt linux-4.9-tcpspin/Documentation/networking/ip-sysctl.txt
+--- linux-4.9/Documentation/networking/ip-sysctl.txt	2016-12-11 20:17:54.000000000 +0100
++++ linux-4.9-tcpspin/Documentation/networking/ip-sysctl.txt	2018-05-08 17:25:42.873283507 +0200
+@@ -735,6 +735,11 @@
+ 	in RFC 5961 (Improving TCP's Robustness to Blind In-Window Attacks)
+ 	Default: 100
+ 
++tcp_spin - INTEGER
++	Uses the 3 reserved TCP header flags as spin bit and Valid Edge 
++	Counter (VEC)
++	Default: 0
++
+ UDP variables:
+ 
+ udp_mem - vector of 3 INTEGERs: min, pressure, max
+diff -aur linux-4.9/include/linux/tcp.h linux-4.9-tcpspin/include/linux/tcp.h
+--- linux-4.9/include/linux/tcp.h	2016-12-11 20:17:54.000000000 +0100
++++ linux-4.9-tcpspin/include/linux/tcp.h	2018-05-17 22:39:36.238718725 +0200
+@@ -242,6 +242,13 @@
+ 	u32	retrans_out;	/* Retransmitted packets out		*/
+ 	u32	max_packets_out;  /* max packets_out in last window */
+ 	u32	max_packets_seq;  /* right edge of max_packets_out flight */
++    
++	u8 spin_value:1,
++	   spin_spinner:1,
++	   spin_last:1, /* spin value to set spin bit */
++	   spin_next_vec:2,  /* last non-zero vec value */
++	   spin_res:3;
++	u32 	spin_vec_rcv_tstamp; /* timestamp of last received VEC */
+ 
+ 	u16	urg_data;	/* Saved octet of OOB data and control flags */
+ 	u8	ecn_flags;	/* ECN status bits.			*/
+diff -aur linux-4.9/include/net/netns/ipv4.h linux-4.9-tcpspin/include/net/netns/ipv4.h
+--- linux-4.9/include/net/netns/ipv4.h	2016-12-11 20:17:54.000000000 +0100
++++ linux-4.9-tcpspin/include/net/netns/ipv4.h	2018-05-16 14:39:41.813814315 +0200
+@@ -79,6 +79,8 @@
+ 	int sysctl_tcp_ecn;
+ 	int sysctl_tcp_ecn_fallback;
+ 
++	int sysctl_tcp_spin;
++
+ 	int sysctl_ip_default_ttl;
+ 	int sysctl_ip_no_pmtu_disc;
+ 	int sysctl_ip_fwd_use_pmtu;
+diff -aur linux-4.9/include/net/tcp.h linux-4.9-tcpspin/include/net/tcp.h
+--- linux-4.9/include/net/tcp.h	2016-12-11 20:17:54.000000000 +0100
++++ linux-4.9-tcpspin/include/net/tcp.h	2018-05-16 14:40:53.342089414 +0200
+@@ -722,6 +722,11 @@
+ #define TCPHDR_ECE 0x40
+ #define TCPHDR_CWR 0x80
+ 
++#define TCPHDR_AE 0x01 /* AccECN bit */
++#define TCPHDR_SPIN 0x02 /* Spin bit */
++#define TCPHDR_VEC 0x0C /* 2-bit Valid Edge Counter (VEC) */
++
++
+ #define TCPHDR_SYN_ECN	(TCPHDR_SYN | TCPHDR_ECE | TCPHDR_CWR)
+ 
+ /* This is what the send packet queuing engine uses to pass
+@@ -747,6 +752,7 @@
+ 		};
+ 	};
+ 	__u8		tcp_flags;	/* TCP header flags. (tcp[13])	*/
++	__u8		tcp_flags2;    /* Reserved TCP header flags. (tcp[12])    */
+ 
+ 	__u8		sacked;		/* State flags for SACK/FACK.	*/
+ #define TCPCB_SACKED_ACKED	0x01	/* SKB ACK'd by a SACK block	*/
+diff -aur linux-4.9/include/uapi/linux/sysctl.h linux-4.9-tcpspin/include/uapi/linux/sysctl.h
+--- linux-4.9/include/uapi/linux/sysctl.h	2016-12-11 20:17:54.000000000 +0100
++++ linux-4.9-tcpspin/include/uapi/linux/sysctl.h	2018-05-16 14:41:43.951584372 +0200
+@@ -424,6 +424,7 @@
+ 	NET_TCP_ALLOWED_CONG_CONTROL=123,
+ 	NET_TCP_MAX_SSTHRESH=124,
+ 	NET_TCP_FRTO_RESPONSE=125,
++	NET_TCP_SPIN=126,
+ };
+ 
+ enum {
+diff -aur linux-4.9/include/uapi/linux/tcp.h linux-4.9-tcpspin/include/uapi/linux/tcp.h
+--- linux-4.9/include/uapi/linux/tcp.h	2016-12-11 20:17:54.000000000 +0100
++++ linux-4.9-tcpspin/include/uapi/linux/tcp.h	2018-05-16 14:42:45.900648591 +0200
+@@ -27,7 +27,9 @@
+ 	__be32	seq;
+ 	__be32	ack_seq;
+ #if defined(__LITTLE_ENDIAN_BITFIELD)
+-	__u16	res1:4,
++    __u16	ac:1,
++		spin:1,
++		vec:2,
+ 		doff:4,
+ 		fin:1,
+ 		syn:1,
+@@ -39,7 +41,9 @@
+ 		cwr:1;
+ #elif defined(__BIG_ENDIAN_BITFIELD)
+ 	__u16	doff:4,
+-		res1:4,
++		ae:1
++		spin:1,
++		vec:2
+ 		cwr:1,
+ 		ece:1,
+ 		urg:1,
+diff -aur linux-4.9/kernel/sysctl_binary.c linux-4.9-tcpspin/kernel/sysctl_binary.c
+--- linux-4.9/kernel/sysctl_binary.c	2016-12-11 20:17:54.000000000 +0100
++++ linux-4.9-tcpspin/kernel/sysctl_binary.c	2018-05-16 14:43:36.306355195 +0200
+@@ -379,6 +379,7 @@
+ 	{ CTL_INT,	NET_TCP_MEM,				"tcp_mem" },
+ 	{ CTL_INT,	NET_TCP_WMEM,				"tcp_wmem" },
+ 	{ CTL_INT,	NET_TCP_RMEM,				"tcp_rmem" },
++	{ CTL_INT,	NET_TCP_SPIN,				"tcp_spin" },
+ 	{ CTL_INT,	NET_TCP_APP_WIN,			"tcp_app_win" },
+ 	{ CTL_INT,	NET_TCP_ADV_WIN_SCALE,			"tcp_adv_win_scale" },
+ 	{ CTL_INT,	NET_TCP_TW_REUSE,			"tcp_tw_reuse" },
+diff -aur linux-4.9/net/ipv4/sysctl_net_ipv4.c linux-4.9-tcpspin/net/ipv4/sysctl_net_ipv4.c
+--- linux-4.9/net/ipv4/sysctl_net_ipv4.c	2016-12-11 20:17:54.000000000 +0100
++++ linux-4.9-tcpspin/net/ipv4/sysctl_net_ipv4.c	2018-05-16 14:44:54.634941310 +0200
+@@ -662,6 +662,13 @@
+ 		.proc_handler	= proc_dointvec_minmax,
+ 		.extra1		= &one
+ 	},
++	{
++		.procname    = "tcp_spin",
++		.data        = &init_net.ipv4.sysctl_tcp_spin,
++		.maxlen      = sizeof(int),
++		.mode        = 0644,
++		.proc_handler    = proc_dointvec
++	},
+ 	{ }
+ };
+ 
+diff -aur linux-4.9/net/ipv4/tcp_input.c linux-4.9-tcpspin/net/ipv4/tcp_input.c
+--- linux-4.9/net/ipv4/tcp_input.c	2016-12-11 20:17:54.000000000 +0100
++++ linux-4.9-tcpspin/net/ipv4/tcp_input.c	2018-05-17 22:39:01.359697469 +0200
+@@ -5393,6 +5393,19 @@
+ 
+ 	tp->rx_opt.saw_tstamp = 0;
+ 
++	/* update spin bit value */
++	if (sock_net(sk)->ipv4.sysctl_tcp_spin && TCP_SKB_CB(skb)->seq >= tp->rcv_nxt) {
++		tp->spin_last = tp->spin_value;
++		tp->spin_value = th->spin;
++		if (tp->spin_last != tp->spin_value) {
++			if (th->vec < 3)
++				tp->spin_next_vec = th->vec + 1;
++			else
++				tp->spin_next_vec = 3;
++			tp->spin_vec_rcv_tstamp = jiffies;
++		}
++	}
++
+ 	/*	pred_flags is 0xS?10 << 16 + snd_wnd
+ 	 *	if header_prediction is to be made
+ 	 *	'S' will always be tp->tcp_header_len >> 2
+diff -aur linux-4.9/net/ipv4/tcp_ipv4.c linux-4.9-tcpspin/net/ipv4/tcp_ipv4.c
+--- linux-4.9/net/ipv4/tcp_ipv4.c	2016-12-11 20:17:54.000000000 +0100
++++ linux-4.9-tcpspin/net/ipv4/tcp_ipv4.c	2018-05-16 14:45:43.668886921 +0200
+@@ -2431,6 +2431,8 @@
+ 		sock_set_flag(sk, SOCK_USE_WRITE_QUEUE);
+ 		*per_cpu_ptr(net->ipv4.tcp_sk, cpu) = sk;
+ 	}
++    
++	net->ipv4.sysctl_tcp_spin = 0;
+ 
+ 	net->ipv4.sysctl_tcp_ecn = 2;
+ 	net->ipv4.sysctl_tcp_ecn_fallback = 1;
+diff -aur linux-4.9/net/ipv4/tcp_output.c linux-4.9-tcpspin/net/ipv4/tcp_output.c
+--- linux-4.9/net/ipv4/tcp_output.c	2016-12-11 20:17:54.000000000 +0100
++++ linux-4.9-tcpspin/net/ipv4/tcp_output.c	2018-05-17 22:39:07.927513154 +0200
+@@ -388,6 +388,25 @@
+ 	}
+ }
+ 
++/* Set the spin bit in the TCP header flags
++ */
++static void tcp_spin(struct tcp_sock *tp, struct tcphdr *th)
++{
++	if (tp->spin_spinner)
++		th->spin = ~tp->spin_value;
++	else
++		th->spin = tp->spin_value;
++	if (tp->spin_next_vec) {
++		/*edge detected */
++		if ((jiffies - tp->spin_vec_rcv_tstamp) > msecs_to_jiffies(1))
++			th->vec = 1;
++		else 
++			th->vec = tp->spin_next_vec;
++		tp->spin_next_vec = 0;
++	}
++
++}
++
+ /* Constructs common control bits of non-data skb. If SYN/FIN is present,
+  * auto increment end seqno.
+  */
+@@ -976,6 +995,9 @@
+ 	th->check		= 0;
+ 	th->urg_ptr		= 0;
+ 
++	if (sock_net(sk)->ipv4.sysctl_tcp_spin)
++		tcp_spin(tp, th);
++
+ 	/* The urg_mode check is necessary during a below snd_una win probe */
+ 	if (unlikely(tcp_urg_mode(tp) && before(tcb->seq, tp->snd_up))) {
+ 		if (before(tp->snd_up, tcb->seq + 0x10000)) {
+@@ -3197,6 +3219,9 @@
+ 
+ 	tp->rx_opt.rcv_wscale = rcv_wscale;
+ 	tp->rcv_ssthresh = tp->rcv_wnd;
++    
++    if (sock_net(sk)->ipv4.sysctl_tcp_spin)
++        tp->spin_spinner = 1;
+ 
+ 	sk->sk_err = 0;
+ 	sock_reset_flag(sk, SOCK_DONE);
