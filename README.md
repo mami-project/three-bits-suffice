@@ -5,8 +5,8 @@ This repository contains the following:
 
 - Patches to add latency spin signal support for TCP to the Linux kernel [4.9](linux-4.9-tcpspin.patch) and [4.15](linux-4.15-tcpspin.patch).
 
-- The simple webserver we used for testing the spin bit with TCP *to appear*
+- The simple [webserver](internet_measurements/webserver/webserver.py) we used for testing the spin bit with TCP.
 
-- All plots for detailed results from our emulated environment measurements of the latency spin signal in QUIC *to appear*
+- The results from all our TCP spin- and TS-based [RTT estimations](internet_measurements/data/).
 
-- All plots for detailed Internet testbed measurements of the latency spin signal in TCP *to appear*
+- [Scripts](internet_measurements/scripts/) to recreate Figure 5 and 6 from the paper.
