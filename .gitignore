@@ -1,1 +1,4 @@
 *.DS_Store
+tcp/pickle_cache/*.pickle
+*__pycache__*
+
