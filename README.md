@@ -20,6 +20,8 @@ This repository contains the following, for the QUIC and TCP measurements:
    For the access network measurements, the prefix of each file is an identifier of the access network,
    and the postfix an identifier of the digital oceans used.
 
-- [Scripts](tcp/scripts/) to recreate Figure 5 and 6 from the paper.
+- [Plots](/tcp/plots) from each measurement run, and Figure 5 and 6 from the paper
+
+- [Scripts](tcp/scripts/) to create these plots
 
 ## QUIC
