@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 #import dill
 import matplotlib.pyplot as plt
 from matplotlib.markers import *
@@ -14,6 +14,12 @@ import os
 import os.path
 import shutil
 import scapy.all
+
+## Script to draw plots for a single measurement run.
+## Call as: analyze_vpp.py path/to/run/directory/
+## Can also be used as a toolkit for other analysis scripts.
+## See make_figure_3_and_4.py as an example
+
 
 INVALID_SPIN_COLOR = "#ff69b450"
 PICKLE_VALID_STRING = "pickle_valid_2"
