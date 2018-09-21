@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # This script generates Figure 6 from the paper.
-# call as: $ scripts/make_figure_6.py data/ path/to/pickle/dir path/to/output/dir
+# call as: $ scripts/make_figure_6.py data/ data/ pickle_cache/ plots/
 # The pickle dir is used to store partially processed data structures,
 # so the data does not have to be read from the csv files every time the script runs.
 
