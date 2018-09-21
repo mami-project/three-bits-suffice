@@ -1,0 +1,11 @@
+traffic_gen: None
+no_baseline: False
+heartbeat: None
+tcp: False
+echo: False
+wait_for_client: False
+time: 80.0
+file: 10GiB
+run_name: w60_delay 5ms 4ms
+dynamic_intf: delay 5ms 4ms
+one_direction: False

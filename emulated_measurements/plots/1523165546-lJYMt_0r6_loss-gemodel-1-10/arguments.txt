@@ -1,0 +1,11 @@
+traffic_gen: None
+no_baseline: False
+heartbeat: None
+tcp: False
+echo: False
+wait_for_client: False
+time: 80.0
+file: 10GiB
+run_name: 1r5_loss gemodel 1 10
+dynamic_intf: loss gemodel 1 10
+one_direction: False
