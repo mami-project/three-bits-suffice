@@ -28,7 +28,9 @@ This repository contains the following, for the QUIC and TCP measurements:
 - The [master thesis](quic/thesis.pdf) this paper was based on.
 
 - A [script](quic/download_dataset.bash) to download the actual QUIC dataset. 
-Be carefull, running this script downloads around 100 GB of data!
+Be carefull, running this script downloads around 80 GB of data!
+Note that depending on where you aquired this repository, it might already contain part
+of the QUIC dataset.
 
 - [Pinq](quic/pinq/), the modified QUIC endpoint implementation used for the experiments.
    This folder is a snapshot of  https://github.com/pietdevaere/minq.
