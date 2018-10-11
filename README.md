@@ -12,8 +12,8 @@ This repository contains the following, for the QUIC and TCP measurements:
 - The results from all our TCP spin- and TS-based [RTT estimations](tcp/data/).
    This data is organized as follows:
   - [01_do-vpp-do](tcp/data/01_do-vpp-do) contains the digital ocean to digital ocean measurements
-  - [02_wired-vpp-do](tcp/data/01_wired-vpp-do) contains the wired access networks to digital ocean measurements
-  - [03_wifi-vpp-do](tcp/data/01_wifi-vpp-do) contains the wireless access networks to digital ocean measurements
+  - [02_wired-vpp-do](tcp/data/02_wired-vpp-do) contains the wired access networks to digital ocean measurements
+  - [03_wifi-vpp-do](tcp/data/03_wifi-vpp-do) contains the wireless access networks to digital ocean measurements
 
    Each CSV file contains data from one measurement.
    For the access network measurements, the prefix of each file is an identifier of the access network,
