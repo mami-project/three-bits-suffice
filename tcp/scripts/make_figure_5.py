@@ -50,6 +50,8 @@ params = {
    'axes.spines.top' : False,
    'axes.spines.right' : False,
    'axes.unicode_minus'  : True,
+   'pdf.fonttype' : 42,
+   'ps.fonttype' : 42
 
 
    }
