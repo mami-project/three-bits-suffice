@@ -6,5 +6,6 @@ read -p "Download dataset? This will use about 100 GB. (y/N) " -n 1 -r
 echo    # (optional) move to a new line
 if [[ $REPLY =~ ^[Yy]$ ]]
 then
+	rm -rf data
 	curl $DATASET_URL | tar -xvzf - 
     fi
