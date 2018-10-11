@@ -8,5 +8,5 @@ read -p "Continue? (y/N) " -n 1 -r
 echo  # newline
 if [[ $REPLY =~ ^[Yy]$ ]]
 	then
-		source <(curl -v $DOWNLOAD_SCRIPT_URL)
+		bash <(curl -v $DOWNLOAD_SCRIPT_URL)
 fi
