@@ -9,6 +9,7 @@ DATASET_URLS=(\
 	"https://www.research-collection.ethz.ch/bitstream/handle/20.500.11850/294813/quic_dataset_part_6.tar"\
 )
 
+echo "--> Run me from within my directory! <--"
 read -p "Download dataset? This will use about 80 GB. (y/N) " -n 1 -r
 echo    # (optional) move to a new line
 if [[ $REPLY =~ ^[Yy]$ ]]
