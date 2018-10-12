@@ -1,7 +1,11 @@
 # three-bits-suffice
 Supporting data and code for IMC 2018 submission "Three Bits Suffice"
 
-This repository contains the following, for the QUIC and TCP measurements:
+The VPP-based middlebox implementation used for all the measurements in the paper can be found in the
+[VPP](vpp) folder. Please read the dedicated [README](vpp/README.md) file for installation and
+usage instructions.
+
+For the QUIC and TCP measurements, we provide:
 
 ## TCP
 
