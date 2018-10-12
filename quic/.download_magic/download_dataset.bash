@@ -14,6 +14,7 @@ echo    # (optional) move to a new line
 if [[ $REPLY =~ ^[Yy]$ ]]
 then
 	rm -rf data
+	mkdir data
 	for URL in "${DATASET_URLS[@]}"
 	do
 		echo $URL
